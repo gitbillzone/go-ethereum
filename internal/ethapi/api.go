@@ -514,8 +514,25 @@ func (s *PublicBlockChainAPI) GetBlockByNumber(ctx context.Context, blockNr rpc.
 				response[field] = nil
 			}
 		}
+
+		head := block.Header()
+		bloom := head.Bloom
+		root := head.Root.String()
+
+		ttt := hexutil.Encode(bloom.Bytes());
+
+		fmt.Println(ttt)
+		value := hexutil.EncodeUint64(1000000000000000000)
+
+		xxx, err := hexutil.DecodeUint64("0xde0b6b3a7640000")
+		fmt.Println(xxx)
+		fmt.Println(value)
+		fmt.Println(root)
+		fmt.Println(response)
+		//MongoTest()
 		return response, err
 	}
+
 	return nil, err
 }
 
