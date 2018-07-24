@@ -129,6 +129,7 @@ func (k *Key) UnmarshalJSON(j []byte) (err error) {
 
 func newKeyFromECDSA(privateKeyECDSA *ecdsa.PrivateKey) *Key {
 	id := uuid.NewRandom()
+	//通过公钥生成地址
 	key := &Key{
 		Id:         id,
 		Address:    crypto.PubkeyToAddress(privateKeyECDSA.PublicKey),
@@ -159,6 +160,7 @@ func NewKeyForDirectICAP(rand io.Reader) *Key {
 }
 
 func newKey(rand io.Reader) (*Key, error) {
+	//通过椭圆加密算法产生公私钥对，并获取地址
 	privateKeyECDSA, err := ecdsa.GenerateKey(crypto.S256(), rand)
 	if err != nil {
 		return nil, err
@@ -167,6 +169,7 @@ func newKey(rand io.Reader) (*Key, error) {
 }
 
 func storeNewKey(ks keyStore, rand io.Reader, auth string) (*Key, accounts.Account, error) {
+	//生成秘钥，钱包地址
 	key, err := newKey(rand)
 	if err != nil {
 		return nil, accounts.Account{}, err

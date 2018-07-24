@@ -289,8 +289,10 @@ func (s *PrivateAccountAPI) DeriveAccount(url string, path string, pin *bool) (a
 	return wallet.Derive(derivPath, *pin)
 }
 
+// 创建一个账户，返回账户地址，输入的密码用于加密私钥
 // NewAccount will create a new account and returns the address for the new account.
 func (s *PrivateAccountAPI) NewAccount(password string) (common.Address, error) {
+	//通过账户管理系统（account manager）来获取Keystore，在keystore中新建一个账户
 	acc, err := fetchKeystore(s.am).NewAccount(password)
 	if err == nil {
 		return acc.Address, nil
