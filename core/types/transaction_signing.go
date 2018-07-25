@@ -52,8 +52,11 @@ func MakeSigner(config *params.ChainConfig, blockNumber *big.Int) Signer {
 	return signer
 }
 
+//在签名时，首先获取交易的RLP哈希值，然后用传入的私钥进行椭圆加密。接着调用WithSignature方法进行初始化。
+//进行到这里，我们交易的签名已经完成，并且封装成为一个带签名的交易。
 // SignTx signs the transaction using the given signer and private key
 func SignTx(tx *Transaction, s Signer, prv *ecdsa.PrivateKey) (*Transaction, error) {
+
 	h := s.Hash(tx)
 	sig, err := crypto.Sign(h[:], prv)
 	if err != nil {

@@ -128,6 +128,7 @@ func (w *keystoreWallet) SignHashWithPassphrase(account accounts.Account, passph
 // transaction with the given account using passphrase as extra authentication.
 func (w *keystoreWallet) SignTxWithPassphrase(account accounts.Account, passphrase string, tx *types.Transaction, chainID *big.Int) (*types.Transaction, error) {
 	// Make sure the requested account is contained within
+	//检测账号的有效性
 	if account.Address != w.account.Address {
 		return nil, accounts.ErrUnknownAccount
 	}
@@ -135,5 +136,6 @@ func (w *keystoreWallet) SignTxWithPassphrase(account accounts.Account, passphra
 		return nil, accounts.ErrUnknownAccount
 	}
 	// Account seems valid, request the keystore to sign
+	//使用keystore进行签名
 	return w.keystore.SignTxWithPassphrase(account, passphrase, tx, chainID)
 }

@@ -400,6 +400,11 @@ func (c *Config) AccountConfig() (int, int, string, error) {
 	return scryptN, scryptP, keydir, err
 }
 
+//在使用geth命令启动中，代码会调用makeFullNode方法产生一个节点。在这个方法中，会调用一个makeConfigNode方法。
+//在这个方法中，代码会将我们输入的启动命令进行解析，并放置在gethConfig中。接下来会调用node.New方法创建一个节点。
+//在node.New方法中，有一个makeAccountManager方法，这个方法是用来建立账户管理系统的。
+
+//在这个方法中，conf.AccountConfig方法会先将我们输入的参数进行解析，并获取keystore的初始值。接下来通过keystore.NewKeyStore方法创建一个Backend。
 func makeAccountManager(conf *Config) (*accounts.Manager, string, error) {
 	scryptN, scryptP, keydir, err := conf.AccountConfig()
 	var ephemeral string
@@ -415,6 +420,7 @@ func makeAccountManager(conf *Config) (*accounts.Manager, string, error) {
 	if err := os.MkdirAll(keydir, 0700); err != nil {
 		return nil, "", err
 	}
+	// 创建一个backend
 	// Assemble the account manager and supported backends
 	backends := []accounts.Backend{
 		keystore.NewKeyStore(keydir, scryptN, scryptP),

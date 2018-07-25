@@ -552,6 +552,15 @@ func (pool *TxPool) local() map[common.Address]types.Transactions {
 
 // validateTx checks whether a transaction is valid according to the consensus
 // rules and adheres to some heuristic limits of the local node (price and size).
+//validateTx会验证一笔交易的以下几个特性：
+//1.首先验证这笔交易的大小，如果大于32kb则拒绝这笔交易，这样主要是为了防止DDOS攻击。
+//2.接着验证转账金额。如果金额小于0则拒绝这笔交易。
+//3.这笔交易的gas不能超过交易池的gas上限。
+//4.验证这笔交易的签名是否合法。
+//5.如果这笔交易不是来自本地并且这笔交易的gas小于当前交易池中的gas，则拒绝这笔交易。
+//6.当前用户的nonce如果大于这笔交易的nonce，则拒绝这笔交易。
+//7.当前用户的余额是否充足，如果不充足则拒绝该笔交易。
+//8.验证这笔交易的固有花费，如果小于交易池的gas，则拒绝该笔交易。
 func (pool *TxPool) validateTx(tx *types.Transaction, local bool) error {
 	// Heuristic limit, reject transactions over 32KB to prevent DOS attacks
 	if tx.Size() > 32*1024 {
@@ -595,6 +604,7 @@ func (pool *TxPool) validateTx(tx *types.Transaction, local bool) error {
 	return nil
 }
 
+
 // add validates a transaction and inserts it into the non-executable queue for
 // later pending promotion and execution. If the transaction is a replacement for
 // an already pending or queued one, it overwrites the previous and returns this
@@ -603,27 +613,43 @@ func (pool *TxPool) validateTx(tx *types.Transaction, local bool) error {
 // If a newly added transaction is marked as local, its sending account will be
 // whitelisted, preventing any associated transaction from being dropped out of
 // the pool due to pricing constraints.
+
+//这个方法主要执行以下操作：
+//1.检查交易池是否含有这笔交易，如果有这笔交易，则异常退出。
+//2.调用validateTx方法对交易的合法性进行验证。如果是非法的交易，则异常退出。
+//3.接下来判断交易池是否超过容量。
+//<1>如果超过容量，并且该笔交易的费用低于当前交易池中列表的最小值，则拒绝这一笔交易。
+//<2>如果超过容量，并且该笔交易的费用比当前交易池中列表最小值高，那么从交易池中移除交易费用最低的交易，为当前这一笔交易留出空间。
+//4.接着继续调用Overlaps方法检查该笔交易的Nonce值，确认该用户下的交易是否存在该笔交易。
+//<1>如果已经存在这笔交易，则删除之前的交易，并将该笔交易放入交易池中，然后返回。
+//<2>如果不存在，则调用enqueueTx将该笔交易放入交易池中。如果交易是本地发出的，则将发送者保存在交易池的local中。
 func (pool *TxPool) add(tx *types.Transaction, local bool) (bool, error) {
 	// If the transaction is already known, discard it
+	//获取交易hash
 	hash := tx.Hash()
+	//交易存在交易池中
 	if pool.all.Get(hash) != nil {
 		log.Trace("Discarding already known transaction", "hash", hash)
 		return false, fmt.Errorf("known transaction: %x", hash)
 	}
 	// If the transaction fails basic validation, discard it
+	// 验证交易的有效性
 	if err := pool.validateTx(tx, local); err != nil {
 		log.Trace("Discarding invalid transaction", "hash", hash, "err", err)
 		invalidTxCounter.Inc(1)
 		return false, err
 	}
+	//交易池超过配置的容量
 	// If the transaction pool is full, discard underpriced transactions
 	if uint64(pool.all.Count()) >= pool.config.GlobalSlots+pool.config.GlobalQueue {
 		// If the new transaction is underpriced, don't accept it
+		//交易费用低于交易池中的最小值，拒绝这笔交易
 		if !local && pool.priced.Underpriced(tx, pool.locals) {
 			log.Trace("Discarding underpriced transaction", "hash", hash, "price", tx.GasPrice())
 			underpricedTxCounter.Inc(1)
 			return false, ErrUnderpriced
 		}
+		//否则删除最小交易费用的交易，未当前交易留出空间
 		// New transaction is better than our worse ones, make room for it
 		drop := pool.priced.Discard(pool.all.Count()-int(pool.config.GlobalSlots+pool.config.GlobalQueue-1), pool.locals)
 		for _, tx := range drop {
@@ -634,7 +660,10 @@ func (pool *TxPool) add(tx *types.Transaction, local bool) (bool, error) {
 	}
 	// If the transaction is replacing an already pending one, do directly
 	from, _ := types.Sender(pool.signer, tx) // already validated
+	// 接着继续调用Overlaps方法检查该笔交易的Nonce值，确认该用户下的交易是否存在该笔交易。
+	//交易池pending列表中存在这笔交易
 	if list := pool.pending[from]; list != nil && list.Overlaps(tx) {
+		// 替换已经存在的交易
 		// Nonce already pending, check if required price bump is met
 		inserted, old := list.Add(tx, pool.config.PriceBump)
 		if !inserted {
@@ -658,12 +687,14 @@ func (pool *TxPool) add(tx *types.Transaction, local bool) (bool, error) {
 
 		return old != nil, nil
 	}
+	//不需要替换，直接插入到交易池
 	// New transaction isn't replacing a pending one, push into queue
 	replace, err := pool.enqueueTx(hash, tx)
 	if err != nil {
 		return false, err
 	}
 	// Mark local addresses and journal local transactions
+	//如果交易是本地发出的，则将发送者保存在交易池的local中。
 	if local {
 		pool.locals.add(from)
 	}
@@ -751,7 +782,7 @@ func (pool *TxPool) promoteTx(addr common.Address, hash common.Hash, tx *types.T
 
 	return true
 }
-
+// 把交易加入到交易池，并确保交易有效性
 // AddLocal enqueues a single transaction into the pool if it is valid, marking
 // the sender as a local one in the mean time, ensuring it goes around the local
 // pricing constraints.
@@ -780,16 +811,23 @@ func (pool *TxPool) AddRemotes(txs []*types.Transaction) []error {
 	return pool.addTxs(txs, false)
 }
 
+//这里一共有两部操作
+// 第一步操作是调用add方法将交易放入到交易池中，
+// 第二步是判断replace参数。如果该笔交易合法并且交易原来不存在在交易池中，则执行promoteExecutables方法，将可处理的交易变为待处理（pending）。
 // addTx enqueues a single transaction into the pool if it is valid.
 func (pool *TxPool) addTx(tx *types.Transaction, local bool) error {
 	pool.mu.Lock()
 	defer pool.mu.Unlock()
 
+	// 把交易加入到交易池中
 	// Try to inject the transaction and update any state
 	replace, err := pool.add(tx, local)
 	if err != nil {
 		return err
 	}
+	//该笔交易合法并且交易原来不存在在交易池中，则执行promoteExecutables方法，将可处理的交易变为待处理（pending）。
+	//会判断replace。如果replace是false，则会执行promoteExecutables方法。
+	//promoteExecutables会将所有可处理的交易放入pending区，并移除所有非法的交易。
 	// If we added a new transaction, run promotion checks and return
 	if !replace {
 		from, _ := types.Sender(pool.signer, tx) // already validated
@@ -899,7 +937,14 @@ func (pool *TxPool) removeTx(hash common.Hash, outofbound bool) {
 		}
 	}
 }
-
+//这个方法首先会迭代所有当前账户的交易，检查当前交易的nonce。如果nonce太低，则删除该笔交易。（list.Forward方法）
+//接下来检查余额不足或者gas不足的交易并删除。（list.Filter方法）
+//然后将剩余的交易状态更新为pending并放在pending集合中。然后将当前消息池该用户的nonce值+1，接着广播TxPreEvent事件，告诉他们本地有一笔新的合法交易等待处理。（pool.promoteTx方法）
+//接着检查消息池的pending列表是否超过容量，如果超过将进行扩容操作。如果一个账户进行的状态超过限制数，从交易池中删除最先添加的交易。
+//在promoteExecutable中有一个promoteTx方法，这个方法是将交易防区pending区方法中。
+//这个Send方法会同步将pending区的交易广播至它所连接到的节点，并返回通知到的节点的量。
+//然后被通知到的节点继续通知到它添加的节点，继而广播至全网。
+//至此，发送交易就结束了。此时交易池中的交易等待挖矿打包处理。
 // promoteExecutables moves transactions that have become processable from the
 // future queue to the set of pending transactions. During this process, all
 // invalidated transactions (low nonce, low balance) are deleted.
@@ -959,6 +1004,7 @@ func (pool *TxPool) promoteExecutables(accounts []common.Address) {
 			delete(pool.queue, addr)
 		}
 	}
+	// 广播通知有新的交易，需要挖矿确认
 	// Notify subsystem for new promoted transactions.
 	if len(promoted) > 0 {
 		go pool.txFeed.Send(NewTxsEvent{promoted})

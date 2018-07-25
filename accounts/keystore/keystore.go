@@ -74,11 +74,13 @@ type unlocked struct {
 	*Key
 	abort chan struct{}
 }
-
+ // 通过给定目录创建keystore
 // NewKeyStore creates a keystore for the given directory.
 func NewKeyStore(keydir string, scryptN, scryptP int) *KeyStore {
 	keydir, _ = filepath.Abs(keydir)
+	//new 一个keystore
 	ks := &KeyStore{storage: &keyStorePassphrase{keydir, scryptN, scryptP}}
+	//通过init方法进行初始化。
 	ks.init(keydir)
 	return ks
 }
@@ -88,6 +90,7 @@ func NewKeyStore(keydir string, scryptN, scryptP int) *KeyStore {
 func NewPlaintextKeyStore(keydir string) *KeyStore {
 	keydir, _ = filepath.Abs(keydir)
 	ks := &KeyStore{storage: &keyStorePlain{keydir}}
+
 	ks.init(keydir)
 	return ks
 }
@@ -299,12 +302,14 @@ func (ks *KeyStore) SignHashWithPassphrase(a accounts.Account, passphrase string
 // SignTxWithPassphrase signs the transaction if the private key matching the
 // given address can be decrypted with the given passphrase.
 func (ks *KeyStore) SignTxWithPassphrase(a accounts.Account, passphrase string, tx *types.Transaction, chainID *big.Int) (*types.Transaction, error) {
+	//使用密码解密本地私钥
 	_, key, err := ks.getDecryptedKey(a, passphrase)
 	if err != nil {
 		return nil, err
 	}
 	defer zeroKey(key.PrivateKey)
 
+	//更具chainID确定签名算法，然后使用私钥签名
 	// Depending on the presence of the chain ID, sign with EIP155 or homestead
 	if chainID != nil {
 		return types.SignTx(tx, types.NewEIP155Signer(chainID), key.PrivateKey)

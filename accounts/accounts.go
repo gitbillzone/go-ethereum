@@ -127,7 +127,7 @@ type Wallet interface {
 	// or optionally with the aid of any location metadata from the embedded URL field.
 	SignTxWithPassphrase(account Account, passphrase string, tx *types.Transaction, chainID *big.Int) (*types.Transaction, error)
 }
-
+// Backend是一个钱包的提供器，包含一系列的账号。Backend可以请求签名交易。
 // Backend is a "wallet provider" that may contain a batch of accounts they can
 // sign transactions with and upon request, do so.
 type Backend interface {
@@ -141,10 +141,12 @@ type Backend interface {
 	// URL assigned by the backend. Since wallets (especially hardware) may come and
 	// go, the same wallet might appear at a different positions in the list during
 	// subsequent retrievals.
+	// Backend是一个接口。其中，Wallets()返回当前可用的钱包，按字母顺序排序。
 	Wallets() []Wallet
 
 	// Subscribe creates an async subscription to receive notifications when the
 	// backend detects the arrival or departure of a wallet.
+	// Subscribe()是创建异步订阅的方法，当钱包发生变动时会通过通道接收到消息并执行。
 	Subscribe(sink chan<- WalletEvent) event.Subscription
 }
 

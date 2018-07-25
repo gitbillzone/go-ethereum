@@ -216,7 +216,7 @@ func NewPrivateAccountAPI(b Backend, nonceLock *AddrLocker) *PrivateAccountAPI {
 		b:         b,
 	}
 }
-
+//从用户管理中读取所有钱包信息，返回所有注册钱包下的所有地址信息。
 // ListAccounts will return a list of addresses for accounts this node manages.
 func (s *PrivateAccountAPI) ListAccounts() []common.Address {
 	addresses := make([]common.Address, 0) // return [] instead of nil if empty
@@ -337,45 +337,55 @@ func (s *PrivateAccountAPI) UnlockAccount(addr common.Address, password string, 
 func (s *PrivateAccountAPI) LockAccount(addr common.Address) bool {
 	return fetchKeystore(s.am).Lock(addr) == nil
 }
-
+//创建并签名交易
 // signTransactions sets defaults and signs the given transaction
 // NOTE: the caller needs to ensure that the nonceLock is held, if applicable,
 // and release it after the transaction has been submitted to the tx pool
 func (s *PrivateAccountAPI) signTransaction(ctx context.Context, args SendTxArgs, passwd string) (*types.Transaction, error) {
 	// Look up the wallet containing the requested signer
 	account := accounts.Account{Address: args.From}
+	//这个方法利用传入的参数from构造一个account，表示转出方。接着会通过账户管理系统accountManager获得该账户的钱包（wallet）。
+	//am.Find方法会从账户管理系统中对钱包进行遍历，找到包含这个account的钱包。
 	wallet, err := s.am.Find(account)
 	if err != nil {
 		return nil, err
 	}
 	// Set some sanity defaults and terminate on failure
+	//接下来会调用setDefaults方法设置一些交易的默认值。如果没有设置Gas，GasPrice，Nonce等，那么它们将会被设置为默认值。
+	//当交易的这些参数都设置好之后，会利用toTransaction方法创建一笔交易。
 	if err := args.setDefaults(ctx, s.b); err != nil {
 		return nil, err
 	}
+	//创建交易可能是普通交易，或者是创建合约交易
 	// Assemble the transaction and sign with the wallet
 	tx := args.toTransaction()
 
+	//获取区块链的配置信息，检查是否是EIP155的配置，并获取链ID。
 	var chainID *big.Int
 	if config := s.b.ChainConfig(); config.IsEIP155(s.b.CurrentBlock().Number()) {
 		chainID = config.ChainID
 	}
+	//签名交易
 	return wallet.SignTxWithPassphrase(account, passwd, tx, chainID)
 }
-
+//发送一笔交易
 // SendTransaction will create a transaction from the given arguments and
 // tries to sign it with the key associated with args.To. If the given passwd isn't
 // able to decrypt the key it fails.
 func (s *PrivateAccountAPI) SendTransaction(ctx context.Context, args SendTxArgs, passwd string) (common.Hash, error) {
+	//对于每一个账户，Nonce会随着转账数的增加而增加，这个参数主要是为了防止双花攻击。
 	if args.Nonce == nil {
 		// Hold the addresse's mutex around signing to prevent concurrent assignment of
 		// the same nonce to multiple accounts.
 		s.nonceLock.LockAddr(args.From)
 		defer s.nonceLock.UnlockAddr(args.From)
 	}
+	//创建并签名交易
 	signed, err := s.signTransaction(ctx, args, passwd)
 	if err != nil {
 		return common.Hash{}, err
 	}
+	//提交交易
 	return submitTransaction(ctx, s.b, signed)
 }
 
@@ -1180,7 +1190,7 @@ func (args *SendTxArgs) setDefaults(ctx context.Context, b Backend) error {
 	}
 	return nil
 }
-
+//创建一笔交易
 func (args *SendTxArgs) toTransaction() *types.Transaction {
 	var input []byte
 	if args.Data != nil {
@@ -1188,11 +1198,17 @@ func (args *SendTxArgs) toTransaction() *types.Transaction {
 	} else if args.Input != nil {
 		input = *args.Input
 	}
+	//这里会对传入的交易信息的to参数进行判断。如果没有to值，那么这是一笔合约转账；而如果有to值，那么就是发起的一笔转账。最终，代码会调用NewTransaction创建一笔交易信息。
 	if args.To == nil {
+		//创建合约交易
 		return types.NewContractCreation(uint64(*args.Nonce), (*big.Int)(args.Value), uint64(*args.Gas), (*big.Int)(args.GasPrice), input)
 	}
+	//普通交易，
 	return types.NewTransaction(uint64(*args.Nonce), *args.To, (*big.Int)(args.Value), uint64(*args.Gas), (*big.Int)(args.GasPrice), input)
 }
+//提交一笔交易到交易池
+
+//submitTransaction方法会将交易发送给backend进行处理，返回经过签名后的交易的hash值。这里主要是SendTx方法对交易进行处理。
 
 // submitTransaction is a helper function that submits tx to txPool and logs a message.
 func submitTransaction(ctx context.Context, b Backend, tx *types.Transaction) (common.Hash, error) {

@@ -27,13 +27,17 @@ import (
 // Manager is an overarching account manager that can communicate with various
 // backends for signing transactions.
 type Manager struct {
+	//所有已注册的Backend
 	backends map[reflect.Type][]Backend // Index of backends currently registered
+	//所有的Backend的更新订阅器
 	updaters []event.Subscription       // Wallet update subscriptions for all backends
+	//Backend更新的订阅槽
 	updates  chan WalletEvent           // Subscription sink for backend wallet changes
+	//所有已经注册的Backends的钱包的缓存
 	wallets  []Wallet                   // Cache of all wallets from all registered backends
-
+	//钱包到达和离开的通知
 	feed event.Feed // Wallet feed notifying of arrivals/departures
-
+    //退出队列的通道
 	quit chan chan error
 	lock sync.RWMutex
 }
@@ -150,6 +154,7 @@ func (am *Manager) Wallet(url string) (Wallet, error) {
 // Find attempts to locate the wallet corresponding to a specific account. Since
 // accounts can be dynamically added to and removed from wallets, this method has
 // a linear runtime in the number of wallets.
+//通过账户管理系统accountManager获得该账户的钱包（wallet）
 func (am *Manager) Find(account Account) (Wallet, error) {
 	am.lock.RLock()
 	defer am.lock.RUnlock()

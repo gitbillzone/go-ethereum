@@ -78,7 +78,7 @@ func NewTransaction(nonce uint64, to common.Address, amount *big.Int, gasLimit u
 func NewContractCreation(nonce uint64, amount *big.Int, gasLimit uint64, gasPrice *big.Int, data []byte) *Transaction {
 	return newTransaction(nonce, nil, amount, gasLimit, gasPrice, data)
 }
-
+//填充了交易结构体中的一些参数，来创建一个交易。到这里，我们的交易就已经创建成功了。
 func newTransaction(nonce uint64, to *common.Address, amount *big.Int, gasLimit uint64, gasPrice *big.Int, data []byte) *Transaction {
 	if len(data) > 0 {
 		data = common.CopyBytes(data)
