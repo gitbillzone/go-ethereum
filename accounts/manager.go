@@ -27,7 +27,7 @@ import (
 // Manager is an overarching account manager that can communicate with various
 // backends for signing transactions.
 type Manager struct {
-	//所有已注册的Backend
+	//所有已注册的Backend，1种类型1个Backend数组
 	backends map[reflect.Type][]Backend // Index of backends currently registered
 	//所有的Backend的更新订阅器
 	updaters []event.Subscription       // Wallet update subscriptions for all backends

@@ -420,7 +420,7 @@ func makeAccountManager(conf *Config) (*accounts.Manager, string, error) {
 	if err := os.MkdirAll(keydir, 0700); err != nil {
 		return nil, "", err
 	}
-	// 创建一个backend
+	// 创建一个backend，KeyStore实现了Backend的接口
 	// Assemble the account manager and supported backends
 	backends := []accounts.Backend{
 		keystore.NewKeyStore(keydir, scryptN, scryptP),
