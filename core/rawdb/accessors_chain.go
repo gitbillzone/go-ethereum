@@ -163,6 +163,7 @@ func WriteHeader(db DatabaseWriter, header *types.Header) {
 		number  = header.Number.Uint64()
 		encoded = encodeBlockNumber(number)
 	)
+	//header的hash + 前缀作为key
 	key := headerNumberKey(hash)
 	if err := db.Put(key, encoded); err != nil {
 		log.Crit("Failed to store hash to number mapping", "err", err)
@@ -196,6 +197,7 @@ func ReadBodyRLP(db DatabaseReader, hash common.Hash, number uint64) rlp.RawValu
 
 // WriteBodyRLP stores an RLP encoded block body into the database.
 func WriteBodyRLP(db DatabaseWriter, hash common.Hash, number uint64, rlp rlp.RawValue) {
+	//区块的hash，编号，前缀组成key
 	if err := db.Put(blockBodyKey(number, hash), rlp); err != nil {
 		log.Crit("Failed to store block body", "err", err)
 	}
@@ -225,10 +227,12 @@ func ReadBody(db DatabaseReader, hash common.Hash, number uint64) *types.Body {
 
 // WriteBody storea a block body into the database.
 func WriteBody(db DatabaseWriter, hash common.Hash, number uint64, body *types.Body) {
+	//对body进行RLP编码
 	data, err := rlp.EncodeToBytes(body)
 	if err != nil {
 		log.Crit("Failed to RLP encode body", "err", err)
 	}
+	//RLP编码内容写入数据库
 	WriteBodyRLP(db, hash, number, data)
 }
 
@@ -332,10 +336,12 @@ func ReadBlock(db DatabaseReader, hash common.Hash, number uint64) *types.Block 
 	}
 	return types.NewBlockWithHeader(header).WithBody(body.Transactions, body.Uncles)
 }
-
+// 写入一个区块到数据库
 // WriteBlock serializes a block into the database, header and body separately.
 func WriteBlock(db DatabaseWriter, block *types.Block) {
+	//写入body，block的hash，序号，和body的数据
 	WriteBody(db, block.Hash(), block.NumberU64(), block.Body())
+	//写入header
 	WriteHeader(db, block.Header())
 }
 

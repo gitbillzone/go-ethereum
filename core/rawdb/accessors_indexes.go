@@ -26,31 +26,38 @@ import (
 // ReadTxLookupEntry retrieves the positional metadata associated with a transaction
 // hash to allow retrieving the transaction or receipt by hash.
 func ReadTxLookupEntry(db DatabaseReader, hash common.Hash) (common.Hash, uint64, uint64) {
+	//根据交易hash获取TxLookupEntry
 	data, _ := db.Get(txLookupKey(hash))
 	if len(data) == 0 {
 		return common.Hash{}, 0, 0
 	}
 	var entry TxLookupEntry
+	// RLP反序列化到TxLookupEntry结构
 	if err := rlp.DecodeBytes(data, &entry); err != nil {
 		log.Error("Invalid transaction lookup entry RLP", "hash", hash, "err", err)
 		return common.Hash{}, 0, 0
 	}
+	//返回block hash，序号，交易在block中的索引
 	return entry.BlockHash, entry.BlockIndex, entry.Index
 }
-
+// 存储交易信息，交易只会存储TxLookupEntry，为了在块中快速找到交易
 // WriteTxLookupEntries stores a positional metadata for every transaction from
 // a block, enabling hash based transaction and receipt lookups.
 func WriteTxLookupEntries(db DatabaseWriter, block *types.Block) {
+	//遍历块中的交易
 	for i, tx := range block.Transactions() {
+
 		entry := TxLookupEntry{
 			BlockHash:  block.Hash(),
 			BlockIndex: block.NumberU64(),
 			Index:      uint64(i),
 		}
+		//RLP编码
 		data, err := rlp.EncodeToBytes(entry)
 		if err != nil {
 			log.Crit("Failed to encode transaction lookup entry", "err", err)
 		}
+		//数据库中的key，前缀 + 交易hash
 		if err := db.Put(txLookupKey(tx.Hash()), data); err != nil {
 			log.Crit("Failed to store transaction lookup entry", "err", err)
 		}
@@ -62,18 +69,22 @@ func DeleteTxLookupEntry(db DatabaseDeleter, hash common.Hash) {
 	db.Delete(txLookupKey(hash))
 }
 
+// 根据交易hash，从数据库立读取一笔交易
 // ReadTransaction retrieves a specific transaction from the database, along with
 // its added positional metadata.
 func ReadTransaction(db DatabaseReader, hash common.Hash) (*types.Transaction, common.Hash, uint64, uint64) {
+	//通过交易hash获取，block hash，序号，交易在block中的索引
 	blockHash, blockNumber, txIndex := ReadTxLookupEntry(db, hash)
 	if blockHash == (common.Hash{}) {
 		return nil, common.Hash{}, 0, 0
 	}
+	//通过block hash和序号，读取块
 	body := ReadBody(db, blockHash, blockNumber)
 	if body == nil || len(body.Transactions) <= int(txIndex) {
 		log.Error("Transaction referenced missing", "number", blockNumber, "hash", blockHash, "index", txIndex)
 		return nil, common.Hash{}, 0, 0
 	}
+	//返回具体交易
 	return body.Transactions[txIndex], blockHash, blockNumber, txIndex
 }
 

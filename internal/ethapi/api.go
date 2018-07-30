@@ -220,6 +220,7 @@ func NewPrivateAccountAPI(b Backend, nonceLock *AddrLocker) *PrivateAccountAPI {
 // ListAccounts will return a list of addresses for accounts this node manages.
 func (s *PrivateAccountAPI) ListAccounts() []common.Address {
 	addresses := make([]common.Address, 0) // return [] instead of nil if empty
+	//账号管理->N个Wallet->没个Wallet里有N个Accout
 	for _, wallet := range s.am.Wallets() {
 		for _, account := range wallet.Accounts() {
 			addresses = append(addresses, account.Address)
@@ -365,13 +366,14 @@ func (s *PrivateAccountAPI) signTransaction(ctx context.Context, args SendTxArgs
 	if config := s.b.ChainConfig(); config.IsEIP155(s.b.CurrentBlock().Number()) {
 		chainID = config.ChainID
 	}
-	//签名交易
+	//签名交易，通过账号的address 获取账号信息，里面包含了加密后私钥的path，然后解密私钥，进行签名。
 	return wallet.SignTxWithPassphrase(account, passwd, tx, chainID)
 }
 //发送一笔交易
 // SendTransaction will create a transaction from the given arguments and
 // tries to sign it with the key associated with args.To. If the given passwd isn't
 // able to decrypt the key it fails.
+// args是个json对象
 func (s *PrivateAccountAPI) SendTransaction(ctx context.Context, args SendTxArgs, passwd string) (common.Hash, error) {
 	//对于每一个账户，Nonce会随着转账数的增加而增加，这个参数主要是为了防止双花攻击。
 	if args.Nonce == nil {
@@ -1206,10 +1208,8 @@ func (args *SendTxArgs) toTransaction() *types.Transaction {
 	//普通交易，
 	return types.NewTransaction(uint64(*args.Nonce), *args.To, (*big.Int)(args.Value), uint64(*args.Gas), (*big.Int)(args.GasPrice), input)
 }
-//提交一笔交易到交易池
-
-//submitTransaction方法会将交易发送给backend进行处理，返回经过签名后的交易的hash值。这里主要是SendTx方法对交易进行处理。
-
+// 提交一笔交易到交易池
+// submitTransaction方法会将交易发送给backend进行处理，返回经过签名后的交易的hash值。这里主要是SendTx方法对交易进行处理。
 // submitTransaction is a helper function that submits tx to txPool and logs a message.
 func submitTransaction(ctx context.Context, b Backend, tx *types.Transaction) (common.Hash, error) {
 	if err := b.SendTx(ctx, tx); err != nil {

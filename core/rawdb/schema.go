@@ -23,6 +23,15 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/metrics"
 )
+// 区块头（Header）的存储格式为：
+//headerPrefix + num (uint64 big endian) + hash -> rlpEncode(header)
+
+//key是由区块头的前缀，区块号和区块hash构成。value是区块头的RLP编码。
+//区块体（Body）的存储格式为：
+//bodyPrefix + num (uint64 big endian) + hash -> rlpEncode(block body)
+
+//key是由区块体前缀，区块号和区块hash构成。value是区块体的RLP编码。
+//在database_util.go中，key的前缀可以区分leveldb中存储的是什么类型的数据。
 
 // The fields below define the low level database schema prefixing.
 var (
@@ -63,11 +72,15 @@ var (
 	preimageHitCounter = metrics.NewRegisteredCounter("db/preimage/hits", nil)
 )
 
+// 交易存储在数据库中的结构，交易的Meta信息结构体如下：
 // TxLookupEntry is a positional metadata to help looking up the data content of
 // a transaction or receipt given only its hash.
 type TxLookupEntry struct {
+	//块的hash
 	BlockHash  common.Hash
+	//块的序号
 	BlockIndex uint64
+	//交易在块中的序号
 	Index      uint64
 }
 
@@ -99,6 +112,7 @@ func headerNumberKey(hash common.Hash) []byte {
 }
 
 // blockBodyKey = blockBodyPrefix + num (uint64 big endian) + hash
+// 区块的hash，编号，前缀组成key
 func blockBodyKey(number uint64, hash common.Hash) []byte {
 	return append(append(blockBodyPrefix, encodeBlockNumber(number)...), hash.Bytes()...)
 }
