@@ -384,6 +384,7 @@ func (self *worker) makeCurrent(parent *types.Block, header *types.Header) error
 	return nil
 }
 
+//提交新的块，新的交易,从交易池中获取未打包的交易，然后提交交易,进行打包
 func (self *worker) commitNewWork() {
 	self.mu.Lock()
 	defer self.mu.Unlock()

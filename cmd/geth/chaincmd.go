@@ -42,15 +42,21 @@ import (
 
 var (
 	initCommand = cli.Command{
+		//调用该指令完成的动作（执行的函数），创建创世块
 		Action:    utils.MigrateFlags(initGenesis),
+		//对应的命令指令
 		Name:      "init",
+		//表示用途
 		Usage:     "Bootstrap and initialize a new genesis block",
+		//显示该命令后面跟的参数个数以及每个参数的意义,
 		ArgsUsage: "<genesisPath>",
+		//这个子命令额外可以执行的命令
 		Flags: []cli.Flag{
 			utils.DataDirFlag,
 			utils.LightModeFlag,
 		},
 		Category: "BLOCKCHAIN COMMANDS",
+		//描述
 		Description: `
 The init command initializes a new genesis block and definition for the network.
 This is a destructive action and changes the network in which you will be

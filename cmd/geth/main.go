@@ -154,7 +154,7 @@ var (
 		utils.MetricsInfluxDBHostTagFlag,
 	}
 )
-
+// cmd下面总共有13个子包，除了util包之外，每个子包都有一个主函数,每个主函数的init方法中都定义了该主函数支持的命令，如
 func init() {
 	// Initialize the CLI app and start Geth
 	app.Action = geth
